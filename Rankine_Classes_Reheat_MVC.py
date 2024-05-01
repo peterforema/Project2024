@@ -20,6 +20,7 @@ class rankineModel():
         This class is for storing data only.  The Controller class should update the model depending on input
         from the user.  The View class should display the model data depending on the desired output.
         '''
+        self.t_mid = None  # Initialize T_Mid
         self.p_low=None  # the low-pressure isobar
         self.p_mid=None   # JES new for project 2024, the mid-pressure isobar
         self.p_high=None  # the high-pressure isobar
@@ -65,7 +66,7 @@ class rankineView():
             :return:
             """
             # Step 1.
-            self.figure = Figure(figsize=(1, 1), tight_layout=True, frameon=True)
+            self.figure = Figure(figsize=(5, 5), tight_layout=True)
             # Step 2.
             self.canvas = FigureCanvasQTAgg(self.figure)
             # Step 3.
@@ -159,19 +160,17 @@ class rankineView():
         x = self.rdo_Quality_2.isChecked()
         self.lbl_TurbineInletCondition_2.setText(
             ("Turbine Inlet: {}{} =".format('x' if x else 'THigh', '' if x else ('(C)' if SI else '(F)'))))
+
     def updateGUI(self, Model=None):
         """
-        The model should already be updated.  This only updates the GUI.
+        The model should already be updated. This only updates the GUI.
         Steps:
-
-        :param args:
         :param Model:
         :return:
         """
-        #unpack the args
         if Model.state1 is None:  # means the cycle has not been evaluated yet
             return
-        steam=Model.steam
+        steam = Model.steam
         #update the line edits and labels
         HCF=1 if Model.SI else UC.kJperkg_to_BTUperlb
         self.lbl_H1.setText("{:0.2f}".format(Model.state1.h * HCF))
@@ -472,6 +471,9 @@ class rankineView():
         else:
             self.canvas.draw()
 class rankineController():
+    MAX_PRESSURE = 100  # Maximum pressure in bar, example value
+    MIN_PRESSURE = 0.1  # Minimum pressure in bar, example value
+
     def __init__(self, *args):
         """
         Create rankineModel object.  The rankineController class updates the model based on user input
@@ -485,6 +487,28 @@ class rankineController():
         self.View.setWidgets(self.InputWidgets, self.DisplayWidgets)
         self.buildVaporDomeData()
         self.iterations=0
+
+    def validate_pressures(self):
+        """
+        Validate the pressure values to ensure they are within the acceptable range.
+        """
+        if any(p < self.MIN_PRESSURE or p > self.MAX_PRESSURE for p in [self.Model.p_low, self.Model.p_mid, self.Model.p_high]):
+            print("Pressure out of range error.")
+            return False
+        return True
+
+    def updateModel(self):
+        """
+        Update the model after ensuring pressures are valid.
+        """
+        if not self.validate_pressures():
+            return  # Stop update if pressures are not valid
+
+        # Proceed with updating the model
+        self.readConditionsFromGUI()
+        self.calc_efficiency()
+        self.updateView()
+
     def UnpackInputWidgets(self):
         #Unpacks input widgets
         self.pb_Optimize, self.rdo_Quality,  self.rdo_Quality_2, self.le_PHigh, self.le_PMid, \
@@ -501,18 +525,22 @@ class rankineController():
             It computes the cycle thermal efficiency.
             It applies a steep penalty if the p_mid exceeds p_high or is below p_low.
             """
-            p=P[0]
-            self.Model.p_mid = p
+            p_mid, t_mid = P
+            self.Model.p_mid = p_mid
+            self.Model.t_mid = t_mid
             eff = self.calc_efficiency()
-            #region penalty functions
-            if p >= self.Model.p_high:
-                pass #$JES MISSING CODE# # implement a penalty
-            if p <= self.Model.p_low:
-                pass  # $JES MISSING CODE# # implement a penalty
-            if self.Model.heat_added_2 <0:
-                pass  # $JES MISSING CODE# # implement a penalty
-            #endregion
-            return 100.0 - eff
+            # Apply penalties for out-of-range values
+            penalty = 0
+            if p_mid >= self.Model.p_high or p_mid <= self.Model.p_low:
+                penalty += 1000
+            if t_mid > self.Model.t_mid_max:
+                penalty += 1000
+            return -(eff - penalty)  # Maximize efficiency by minimizing negative efficiency
+
+        initial_conditions = [self.Model.p_mid, self.Model.t_mid]
+        result = minimize(objFn, initial_conditions, method="Nelder-Mead")
+        self.Model.p_mid, self.Model.t_mid = result.x
+        self.updateModel()  # Update the model and view with optimized values
         #set initial guess for p_mid as a numpy array
         ic=np.array([self.Model.p_low + 0.01 * (self.Model.p_high - self.Model.p_low)])
         #set self.Model.t_high and self.Model.t_high_2 to match view

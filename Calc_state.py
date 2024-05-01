@@ -5,6 +5,7 @@ from scipy.optimize import fsolve
 from UnitConversions import UnitConverter as UC
 from pyXSteam.XSteam import XSteam
 from pyXSteam import Constants
+import math
 
 
 # endregion
@@ -247,6 +248,8 @@ class StateDataForPlotting:
 
 
 class Steam_SI:
+    MIN_PRESSURE = 0.006  # Minimum pressure in bar (example, adjust as needed)
+    MAX_PRESSURE = 220  # Maximum pressure in bar (example, adjust as needed)
     def __init__(self, P=None, T=None, x=None, v=None, h=None, u=None, s=None, name=None):
         """
         This is a general steam class for sub-critical (i.e., superheated, subcooled and saturated) properties of steam.
@@ -280,6 +283,12 @@ class Steam_SI:
         self.RW = UC.R / UC.MW_Water  # water gas constant kJ/(kg*K)
         self.getState(P=P, T=T, x=x, v=v, h=h, u=u, s=s)
 
+    def validate_pressure(self, pressure):
+        """ Ensure the pressure is within the operational range of the steam tables. """
+        if pressure < self.MIN_PRESSURE or pressure > self.MAX_PRESSURE:
+            print(f"Adjusting pressure from {pressure} to fit within the valid range.")
+            pressure = max(min(pressure, self.MAX_PRESSURE), self.MIN_PRESSURE)
+        return pressure
     def getsatProps_p(self, p):
         """
         Given a pressure, calculate the saturated properties for that isobar
@@ -453,7 +462,7 @@ class Steam_SI:
                 self.state.t = T
                 self.satProps.tsat = round(self.satProps.tsat, 3)  # I will compare at 3 three decimal places
                 # compare T to tsat
-                if T < self.satProps.tsat or T > self.satProps.tsat or self.satProps.tsat is "nan":
+                if T < self.satProps.tsat or T > self.satProps.tsat or math.isnan(self.satProps.tsat):
                     self.region = "sub-cooled liquid" if T < self.satProps.tsat else "super-heated vapor"
                     self.calcState_1Phase()
                 else:  # this is ambiguous since at saturated temperature
