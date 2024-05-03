@@ -6,6 +6,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from copy import deepcopy as dc
 from scipy.optimize import minimize
+from PyQt5 import QtWidgets as qtw
+import logging
+
 #these imports are necessary for drawing a matplot lib graph on my GUI
 #no simple widget for this exists in QT Designer, so I have to add the widget in code.
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
@@ -488,12 +491,15 @@ class rankineController():
         self.buildVaporDomeData()
         self.iterations=0
 
-    def validate_pressures(self):
-        """
-        Validate the pressure values to ensure they are within the acceptable range.
-        """
-        if any(p < self.MIN_PRESSURE or p > self.MAX_PRESSURE for p in [self.Model.p_low, self.Model.p_mid, self.Model.p_high]):
-            print("Pressure out of range error.")
+    def validatePressureInput(self):
+        try:
+            p_high = float(self.le_PHigh.text())
+            p_mid = float(self.le_PMid.text())
+            p_low = float(self.le_PLow.text())
+            if not (0 < p_low <= p_mid <= p_high):
+                raise ValueError("Pressure values must be 0 < P_low <= P_mid <= P_high")
+        except ValueError as e:
+            qtw.QMessageBox.critical(self, 'Input Error', str(e))
             return False
         return True
 
@@ -501,13 +507,13 @@ class rankineController():
         """
         Update the model after ensuring pressures are valid.
         """
-        if not self.validate_pressures():
-            return  # Stop update if pressures are not valid
-
-        # Proceed with updating the model
-        self.readConditionsFromGUI()
-        self.calc_efficiency()
-        self.updateView()
+        try:   #attempts to find errors
+            if self.validate_pressures():
+                self.readConditionsFromGUI()
+                self.calc_efficiency()
+                self.updateView()
+        except ValueError as e: #attempts to find errors
+            print(e)  # or handle this in your GUI with a popup message
 
     def UnpackInputWidgets(self):
         #Unpacks input widgets

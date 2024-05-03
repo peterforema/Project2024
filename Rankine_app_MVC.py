@@ -41,6 +41,18 @@ class MainWindow(qtw.QWidget, Ui_Form):
         # End main ui code
         self.show()
 
+    def validatePressureInput(self):
+        try:
+            p_high = float(self.le_PHigh.text())
+            p_mid = float(self.le_PMid.text())
+            p_low = float(self.le_PLow.text())
+            if not (0 < p_low <= p_mid <= p_high):
+                raise ValueError("Pressure values must be 0 < P_low <= P_mid <= P_high")
+        except ValueError as e:
+            qtw.QMessageBox.critical(self, 'Input Error', str(e))
+            return False
+        return True
+
     def AssignSlots(self):
         """
         Setup signals and slots for my program.  You should notice that all the slots
@@ -53,9 +65,9 @@ class MainWindow(qtw.QWidget, Ui_Form):
         self.rdo_THigh.clicked.connect(self.RC.selectQualityOrTHigh_Turbine1)
         self.rdo_Quality_2.clicked.connect(self.RC.selectQualityOrTHigh_Turbine2)
         self.rdo_THigh_2.clicked.connect(self.RC.selectQualityOrTHigh_Turbine2)
-        self.le_PHigh.editingFinished.connect(self.RC.updateSatProps)
-        self.le_PMid.editingFinished.connect(self.RC.updateSatProps)
-        self.le_PLow.editingFinished.connect(self.RC.updateSatProps)
+        self.le_PHigh.editingFinished.connect(self.validatePressureInput)#run validate Pressure Input
+        self.le_PMid.editingFinished.connect(self.validatePressureInput)#run validate Pressure Input
+        self.le_PLow.editingFinished.connect(self.validatePressureInput)#run validate Pressure Input
         self.rb_SI.clicked.connect(self.RC.updateUnits)
         self.rb_English.clicked.connect(self.RC.updateUnits)
         self.cmb_XAxis.currentIndexChanged.connect(self.RC.updatePlot)
